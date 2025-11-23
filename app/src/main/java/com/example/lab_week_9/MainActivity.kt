@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -29,6 +30,14 @@ import com.example.lab_week_9.ui.theme.OnBackgroundItemText
 import com.example.lab_week_9.ui.theme.OnBackgroundTitleText
 import com.example.lab_week_9.ui.theme.PrimaryTextButton
 
+// Navigation imports
+import androidx.navigation.NavType
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,21 +47,49 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    Home()
+                    // (5) Root sekarang App(), bukan Home()
+                    val navController = rememberNavController()
+                    App(navController = navController)
                 }
             }
         }
     }
 }
 
-// Data model
-data class Student(
-    var name: String
-)
-
-// Parent: pegang state
+// (4) Root composable + graph routes
 @Composable
-fun Home() {
+fun App(navController: NavHostController) {
+    NavHost(
+        navController = navController,
+        startDestination = "home"
+    ) {
+        composable("home") {
+            // kirim lambda buat navigate
+            Home { listAsString ->
+                navController.navigate("resultContent/?listData=$listAsString")
+            }
+        }
+        composable(
+            route = "resultContent/?listData={listData}",
+            arguments = listOf(
+                navArgument("listData") { type = NavType.StringType }
+            )
+        ) {
+            ResultContent(
+                it.arguments?.getString("listData").orEmpty()
+            )
+        }
+    }
+}
+
+// Data model
+data class Student(var name: String)
+
+// (6) Parent: sekarang menerima lambda navigate
+@Composable
+fun Home(
+    navigateFromHomeToResult: (String) -> Unit
+) {
     val listData = remember {
         mutableStateListOf(
             Student("Tanu"),
@@ -60,8 +97,9 @@ fun Home() {
             Student("Tono")
         )
     }
-    val inputField = remember { mutableStateOf(Student("")) }
+    var inputField = remember { mutableStateOf(Student("")) }
 
+    // (8) Panggil HomeContent dengan extra param navigasi
     HomeContent(
         listData = listData,
         inputField = inputField.value,
@@ -73,20 +111,25 @@ fun Home() {
                 listData.add(Student(inputField.value.name))
                 inputField.value = Student("")
             }
+        },
+        navigateFromHomeToResult = {
+            // kirim snapshot list sebagai String
+            navigateFromHomeToResult(listData.toList().toString())
         }
     )
 }
 
-// Child: render UI (pakai Elements.kt)
+// (7) Child: tambah param navigate
 @Composable
 fun HomeContent(
     listData: SnapshotStateList<Student>,
     inputField: Student,
     onInputValueChange: (String) -> Unit,
-    onButtonClick: () -> Unit
+    onButtonClick: () -> Unit,
+    navigateFromHomeToResult: () -> Unit
 ) {
     LazyColumn {
-        // header + input
+        // header + input + 2 tombol
         item {
             Column(
                 modifier = Modifier
@@ -94,30 +137,32 @@ fun HomeContent(
                     .fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Title dari Elements
-                OnBackgroundTitleText(
-                    text = stringResource(id = R.string.enter_item)
-                )
+                OnBackgroundTitleText(text = stringResource(id = R.string.enter_item))
 
                 TextField(
                     value = inputField.name,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text
+                    ),
                     onValueChange = { onInputValueChange(it) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp)
                 )
 
-                // Button dari Elements
-                PrimaryTextButton(
-                    text = stringResource(id = R.string.button_click)
-                ) {
-                    onButtonClick()
+                Row {
+                    PrimaryTextButton(
+                        text = stringResource(id = R.string.button_click)
+                    ) { onButtonClick() }
+
+                    PrimaryTextButton(
+                        text = stringResource(id = R.string.button_navigate)
+                    ) { navigateFromHomeToResult() }
                 }
             }
         }
 
-        // list items
+        // daftar nama
         items(listData) { item ->
             Column(
                 modifier = Modifier
@@ -125,17 +170,31 @@ fun HomeContent(
                     .fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Item text dari Elements
                 OnBackgroundItemText(text = item.name)
             }
         }
     }
 }
 
+// (10) Halaman hasil: tampilkan string list
+@Composable
+fun ResultContent(listData: String) {
+    Column(
+        modifier = Modifier
+            .padding(vertical = 4.dp)
+            .fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        OnBackgroundItemText(text = listData)
+    }
+}
+
+// Preview dev: App dengan navController dummy
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-fun PreviewHome() {
+fun PreviewApp() {
     LAB_WEEK_9Theme {
-        Home()
+        val nav = rememberNavController()
+        App(navController = nav)
     }
 }
