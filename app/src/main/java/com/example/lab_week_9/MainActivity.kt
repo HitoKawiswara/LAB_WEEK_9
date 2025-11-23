@@ -10,10 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -25,15 +23,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.lab_week_9.ui.theme.LAB_WEEK_9Theme
 import androidx.compose.ui.text.input.KeyboardType
+import com.example.lab_week_9.ui.theme.LAB_WEEK_9Theme
+import com.example.lab_week_9.ui.theme.OnBackgroundItemText
+import com.example.lab_week_9.ui.theme.OnBackgroundTitleText
+import com.example.lab_week_9.ui.theme.PrimaryTextButton
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             LAB_WEEK_9Theme {
-                // (6) Surface cukup memanggil Home() karena sekarang state dipegang di Home
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -45,15 +45,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// (2) Data model untuk state input
+// Data model
 data class Student(
     var name: String
 )
 
-// (3) Parent: pegang state list dan input, delegasi ke child HomeContent
+// Parent: pegang state
 @Composable
 fun Home() {
-    // List state yang bisa diubah-ubah
     val listData = remember {
         mutableStateListOf(
             Student("Tanu"),
@@ -61,15 +60,12 @@ fun Home() {
             Student("Tono")
         )
     }
-
-    // State untuk input field
     val inputField = remember { mutableStateOf(Student("")) }
 
     HomeContent(
         listData = listData,
         inputField = inputField.value,
         onInputValueChange = { input ->
-            // update hanya field name
             inputField.value = inputField.value.copy(name = input)
         },
         onButtonClick = {
@@ -81,7 +77,7 @@ fun Home() {
     )
 }
 
-// (4) Child: render UI, terima data + event handler dari parent
+// Child: render UI (pakai Elements.kt)
 @Composable
 fun HomeContent(
     listData: SnapshotStateList<Student>,
@@ -90,14 +86,18 @@ fun HomeContent(
     onButtonClick: () -> Unit
 ) {
     LazyColumn {
+        // header + input
         item {
             Column(
                 modifier = Modifier
                     .padding(16.dp)
-                    .fillMaxWidth(),
+                    .fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(text = stringResource(id = R.string.enter_item))
+                // Title dari Elements
+                OnBackgroundTitleText(
+                    text = stringResource(id = R.string.enter_item)
+                )
 
                 TextField(
                     value = inputField.name,
@@ -108,30 +108,30 @@ fun HomeContent(
                         .padding(top = 8.dp)
                 )
 
-                Button(
-                    onClick = onButtonClick,
-                    modifier = Modifier.padding(top = 12.dp)
+                // Button dari Elements
+                PrimaryTextButton(
+                    text = stringResource(id = R.string.button_click)
                 ) {
-                    Text(text = stringResource(id = R.string.button_click))
+                    onButtonClick()
                 }
             }
         }
 
-        // Render list student
+        // list items
         items(listData) { item ->
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = 4.dp)
+                    .fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(text = item.name)
+                // Item text dari Elements
+                OnBackgroundItemText(text = item.name)
             }
         }
     }
 }
 
-// Preview dev only (Home tanpa parameter, jadi aman dipreview)
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun PreviewHome() {
