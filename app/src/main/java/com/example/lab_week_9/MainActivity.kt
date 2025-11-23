@@ -1,5 +1,6 @@
 package com.example.lab_week_9
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -30,13 +31,16 @@ import com.example.lab_week_9.ui.theme.OnBackgroundItemText
 import com.example.lab_week_9.ui.theme.OnBackgroundTitleText
 import com.example.lab_week_9.ui.theme.PrimaryTextButton
 
-// Navigation imports
 import androidx.navigation.NavType
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,7 +51,6 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // (5) Root sekarang App(), bukan Home()
                     val navController = rememberNavController()
                     App(navController = navController)
                 }
@@ -56,7 +59,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// (4) Root composable + graph routes
 @Composable
 fun App(navController: NavHostController) {
     NavHost(
@@ -64,28 +66,21 @@ fun App(navController: NavHostController) {
         startDestination = "home"
     ) {
         composable("home") {
-            // kirim lambda buat navigate
-            Home { listAsString ->
-                navController.navigate("resultContent/?listData=$listAsString")
+            Home { jsonEncoded ->
+                navController.navigate("resultContent/?listData=$jsonEncoded")
             }
         }
         composable(
             route = "resultContent/?listData={listData}",
-            arguments = listOf(
-                navArgument("listData") { type = NavType.StringType }
-            )
+            arguments = listOf(navArgument("listData") { type = NavType.StringType })
         ) {
-            ResultContent(
-                it.arguments?.getString("listData").orEmpty()
-            )
+            ResultContent(it.arguments?.getString("listData").orEmpty())
         }
     }
 }
 
-// Data model
 data class Student(var name: String)
 
-// (6) Parent: sekarang menerima lambda navigate
 @Composable
 fun Home(
     navigateFromHomeToResult: (String) -> Unit
@@ -97,9 +92,16 @@ fun Home(
             Student("Tono")
         )
     }
-    var inputField = remember { mutableStateOf(Student("")) }
+    val inputField = remember { mutableStateOf(Student("")) }
 
-    // (8) Panggil HomeContent dengan extra param navigasi
+    val moshi = remember {
+        Moshi.Builder()
+            .add(KotlinJsonAdapterFactory())
+            .build()
+    }
+    val listType = remember { Types.newParameterizedType(List::class.java, Student::class.java) }
+    val adapter = remember { moshi.adapter<List<Student>>(listType) }
+
     HomeContent(
         listData = listData,
         inputField = inputField.value,
@@ -107,19 +109,20 @@ fun Home(
             inputField.value = inputField.value.copy(name = input)
         },
         onButtonClick = {
-            if (inputField.value.name.isNotBlank()) {
-                listData.add(Student(inputField.value.name))
+            val trimmed = inputField.value.name.trim()
+            if (trimmed.isNotEmpty()) {
+                listData.add(Student(trimmed))
                 inputField.value = Student("")
             }
         },
         navigateFromHomeToResult = {
-            // kirim snapshot list sebagai String
-            navigateFromHomeToResult(listData.toList().toString())
+            val json = adapter.toJson(listData.toList())
+            val encoded = Uri.encode(json)
+            navigateFromHomeToResult(encoded)
         }
     )
 }
 
-// (7) Child: tambah param navigate
 @Composable
 fun HomeContent(
     listData: SnapshotStateList<Student>,
@@ -129,7 +132,6 @@ fun HomeContent(
     navigateFromHomeToResult: () -> Unit
 ) {
     LazyColumn {
-        // header + input + 2 tombol
         item {
             Column(
                 modifier = Modifier
@@ -141,9 +143,7 @@ fun HomeContent(
 
                 TextField(
                     value = inputField.name,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text
-                    ),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     onValueChange = { onInputValueChange(it) },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -162,7 +162,6 @@ fun HomeContent(
             }
         }
 
-        // daftar nama
         items(listData) { item ->
             Column(
                 modifier = Modifier
@@ -176,20 +175,32 @@ fun HomeContent(
     }
 }
 
-// (10) Halaman hasil: tampilkan string list
 @Composable
 fun ResultContent(listData: String) {
-    Column(
+    val decoded = remember(listData) { Uri.decode(listData) }
+    val moshi = remember {
+        Moshi.Builder()
+            .add(KotlinJsonAdapterFactory())
+            .build()
+    }
+    val listType = remember { Types.newParameterizedType(List::class.java, Student::class.java) }
+    val adapter = remember { moshi.adapter<List<Student>>(listType) }
+    val parsed: List<Student> = remember(decoded) {
+        runCatching { adapter.fromJson(decoded) ?: emptyList() }.getOrElse { emptyList() }
+    }
+
+    LazyColumn(
         modifier = Modifier
             .padding(vertical = 4.dp)
             .fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        OnBackgroundItemText(text = listData)
+        items(parsed) { student ->
+            OnBackgroundItemText(text = student.name)
+        }
     }
 }
 
-// Preview dev: App dengan navController dummy
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun PreviewApp() {
